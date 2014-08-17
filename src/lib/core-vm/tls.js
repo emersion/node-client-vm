@@ -62,6 +62,7 @@ exports.connect = function (options, callback) {
 	});
 	socket.on('end', function() {
 		console.log('[socket] disconnected');
+		cleartextStream.emit('end');
 	});
 	if (socket.readyState !== 'open') {
 		socket.on('connect', function() {

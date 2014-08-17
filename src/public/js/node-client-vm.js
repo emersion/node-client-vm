@@ -170,15 +170,22 @@
 					this._ws.addEventListener('close', function () {
 						console.log('TCP closed');
 						that._ws = null;
-					});
 
+						if (that.owner) {
+							that.owner.emit('_socketEnd');
+						}
+					});
+console.log(this);
 					return deferred;
 				},
 
 				close: function () {
+					if (!this._ws) {
+						return;
+					}
+
 					console.log('TCP close');
 					this._ws.close();
-					this._ws = null;
 				},
 				unref: function () {
 					console.warn('TCP unref');
@@ -471,7 +478,18 @@ console.info('binding '+id);
 			Buffer: Node.Buffer,
 			require: module.require.bind(module), // TODO: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/bind#Browser_compatibility
 			module: module,
-			exports: module.exports
+			exports: module.exports,
+
+			// But that's not all
+			// @see https://gist.github.com/WebReflection/9629102
+			DTRACE_NET_STREAM_END: function () {},
+			DTRACE_NET_SOCKET_READ: function () {},
+			DTRACE_NET_SOCKET_WRITE: function () {},
+			DTRACE_NET_SERVER_CONNECTION: function () {},
+			DTRACE_HTTP_SERVER_REQUEST: function () {},
+			DTRACE_HTTP_CLIENT_RESPONSE: function () {},
+			DTRACE_HTTP_SERVER_RESPONSE: function () {},
+			DTRACE_HTTP_CLIENT_REQUEST: function () {}
 		});
 
 		var argsNames = [],
