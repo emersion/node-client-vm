@@ -3,9 +3,6 @@
   "version": "0.0.1",
   "description": "A client-side virtual machine for Node.js.",
   "main": "src/server.js",
-  "scripts": {
-    "test": "grunt test"
-  },
   "repository": {
     "type": "git",
     "url": "git://github.com/emersion/node-client-vm.git"
