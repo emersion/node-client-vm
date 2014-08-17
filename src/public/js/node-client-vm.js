@@ -1,109 +1,27 @@
 (function () {
 	var global = this;
 
+	/**
+	 * Node client virtual machine.
+	 * @author emersion <contact@emersion.fr>
+	 * @license The MIT license
+	 */
 	var Node = {};
 
-	/*Node.Buffer = function (input) {
-		var that = this;
-
-		this._data = '';
-		this.offset = 0;
-
-		var oldLength = 0;
-		Object.defineProperty(this, 'length', {
-			get: function () {
-				var length = that._data.length;
-
-				// Define array-like accessors: buffer[0], buffer[1], etc...
-				if (length != oldLength) {
-					var defineGetter = function (i) {
-						if (!Object.prototype.hasOwnProperty.call(that, i)) {
-							Object.defineProperty(that, i, {
-								get: function () {
-									return that._data.charCodeAt(i);
-								},
-								set: function (charCode) {
-									that._data[i] = String.fromCharCode(charCode);
-								}
-							});
-						}
-					};
-					for (var i = 0; i < length; i++) {
-						defineGetter(i);
-					}
-
-					oldLength = length;
-				}
-
-				return length;
-			}
-		});
-
-		if (input) {
-			this.write(input);
-		}
-	};
-	Node.Buffer.prototype = {
-		read: function () {
-			console.log('Node.Buffer#read', arguments);
-		},
-		write: function (input) {
-			if (Node.Buffer.isBuffer(input)) {
-				return this.writeBuffer(input);
-			} else {
-				return this.writeUtf8String(input);
-			}
-		},
-		writeBuffer: function (buf) {
-			console.log('Node.Buffer#writeBuffer', arguments);
-			return this.writeUtf8String(buf.toString());
-		},
-		writeAsciiString: function () {
-			console.log('Node.Buffer#writeAsciiString', arguments);
-			this._data += str;
-		},
-		writeUtf8String: function (str) {
-			console.log('Node.Buffer#writeUtf8String', arguments);
-			this._data += str;
-		},
-		writeUcs2String: function (str) {
-			console.log('Node.Buffer#writeUcs2String', arguments);
-			this._data += str;
-		},
-		slice: function () {
-			return new Node.Buffer(this._data.slice.apply(this._data, arguments));
-		},
-		toString: function (type) {
-			var output = this._data;
-			switch (type) {
-				case 'base64':
-					return window.btoa(output);
-				default:
-					return output;
-			}
-		},
-		copy: function () {
-			return new Node.Buffer(this._data);
-		},
-		splice: function () {
-			return new Node.Buffer(this._data.splice.apply(this._data, arguments));
-		}
-	};
-	Node.Buffer.isBuffer = function (input) {
-		return (input instanceof Node.Buffer);
-	};
-	Node.Buffer.concat = function (buffers) {
-		var newBuffer = new Node.Buffer();
-
-		for (var i = 0; i < buffers.length; i++) {
-			newBuffer.write(buffers[i].toString());
-		}
-
-		return newBuffer;
-	};*/
-
+	/**
+	 * The Buffer implementation.
+	 * This will be populated when loading core modules.
+	 */
 	Node.Buffer = null;
 
+	// Helper functions for communicating with the server
+	/**
+	 * Call a wrapper.
+	 * @param  {String} endpoint The wrapper endpoint.
+	 * @param  {Array}  data     Arguments to provide to the wrapper.
+	 * @param  {String} [type]   The request method.
+	 * @return {$.Deferred}      A deferred object.
+	 */
 	var callWrapper = function (endpoint, data, type) {
 		return $.ajax({
 			url: '/api/vm/wrap'+endpoint,
@@ -115,6 +33,7 @@
 			return results;
 		});
 	};
+	// Same as above, but taking an Arguments object as data
 	var wrap = function (endpoint, args) {
 		args = Array.prototype.slice.call(args);
 		return callWrapper(endpoint, args).then(function (results) {
@@ -122,6 +41,7 @@
 		});
 	};
 
+	// Call a core method
 	var callCore = function (endpoint, data, opts) {
 		opts = $.extend({
 			type: 'post'
@@ -137,6 +57,12 @@
 			return results;
 		});
 	};
+	/**
+	 * Asynchronously call a core method.
+	 * @param  {String} endpoint The method endpoint.
+	 * @param  {Arguments} args  Arguments to pass to the method.
+	 * @return {$.Deferred}      A deferred object.
+	 */
 	var denodeify = function (endpoint, args) {
 		args = Array.prototype.slice.call(args);
 		var callback = args.pop();
@@ -146,7 +72,11 @@
 		});
 	};
 
+	/**
+	 * The `process` object.
+	 */
 	var process = (function () {
+		// Some native wrappers
 		var native = {};
 		native.timer_wrap = (function () {
 			//TODO: https://github.com/joyent/node/blob/master/src/timer_wrap.cc
@@ -297,29 +227,26 @@
 				},
 
 				writeBuffer: function (buf) {
-					return this.writeUtf8String(buf);
-				},
-				writeAsciiString: function () {
-					console.warn('TCP writeAsciiString', arguments);
-				},
-				writeUtf8String: function (str) {
 					var that = this;
 					var req = {};
 
-					this._ws.send(str);
+					this._ws.send(buf);
 
-					// TODO: wait for confirm message from server?
+					// TODO: wait for a confirm message from server?
 					setTimeout(function () {
 						req.oncomplete(0, that, req);
 					}, 0);
 
 					return req;
 				},
-				writeUcs2String: function () {
-					console.warn('TCP writeUcs2String', arguments);
+				writeAsciiString: function (str) {
+					return this.writeBuffer(str);
 				},
-				writev: function () {
-					console.warn('TCP writev', arguments);
+				writeUtf8String: function (str) {
+					return this.writeBuffer(str);
+				},
+				writeUcs2String: function (str) {
+					return this.writeBuffer(str);
 				},
 
 				open: function () {
@@ -328,7 +255,9 @@
 				bind: function () {
 					console.warn('TCP bind');
 				},
-				listen: function () {},
+				listen: function () {
+					throw new Error('tcp_wrap.listen() is not implemented in the browser');
+				},
 				connect: function () {
 					var that = this;
 					console.log('TCP connect', arguments);
@@ -372,7 +301,7 @@
 			return tcp;
 		})();
 		native.pipe_wrap = (function () {
-			//TODO
+			//TODO: not impemented
 			var pipe = {};
 
 			pipe.Pipe = function () {};
@@ -400,32 +329,6 @@
 
 			return pipe;
 		})();
-		native.tls_wrap = (function () {
-			var tls = {};
-			console.warn('tls_wrap native binding not implemented');
-
-			tls.TLSWrap = function () {
-				console.warn('TLS', arguments);
-			};
-			tls.TLSWrap.prototype = {
-				wrap: function (handle, context, isServer) {
-					console.warn('TLS wrap', arguments);
-				},
-				receive: function () {
-					console.warn('TLS receive', arguments);
-				},
-				start: function () {
-					console.warn('TLS start', arguments);
-				},
-				setVerifyMode: function () {},
-				enableSessionCallbacks: function () {},
-				enableHelloParser: function () {},
-				getServername: function () {},
-				setServername: function () {}
-			};
-
-			return tls;
-		})();
 		native.constants = (function () {
 			//TODO: https://github.com/joyent/node/blob/master/src/node_constants.cc
 			// @see http://www.virtsync.com/c-error-codes-include-errno
@@ -434,6 +337,9 @@
 
 			return constants;
 		})();
+		/**
+		 * Emulation of the native `os` binding.
+		 */
 		native.os = (function () {
 			var startTime = (new Date()).getTime();
 
@@ -529,6 +435,9 @@ console.info('binding '+id);
 		};
 	})();
 
+	/**
+	 * Core modules.
+	 */
 	var core = (function () {
 		var core = {};
 
@@ -548,7 +457,14 @@ console.info('binding '+id);
 		return core;
 	})();
 
+	/**
+	 * Core modules from Node.js source.
+	 */
 	var coreScripts = null;
+
+	/**
+	 * Load the core.
+	 */
 	var loadCore = function () {
 		if (coreScripts) {
 			return $.Deferred().resolveWith(coreScripts);
@@ -573,6 +489,7 @@ console.info('binding '+id);
 		var parentExports = module.exports;
 		module.exports = {};
 
+		// Local scope
 		bindings = $.extend({
 			__filename: module.filename,
 			__dirname: ''
@@ -583,8 +500,7 @@ console.info('binding '+id);
 			Buffer: Node.Buffer,
 			require: module.require.bind(module), // TODO: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/bind#Browser_compatibility
 			module: module,
-			exports: module.exports,
-			//debug: function () { console.log.apply(console, arguments); }
+			exports: module.exports
 		});
 
 		var argsNames = [],
@@ -618,6 +534,11 @@ console.info('binding '+id);
 		return exports;
 	};
 
+	/**
+	 * A Node module.
+	 * @param {Object} data   The module data.
+	 * @param {Node.Module} parent The parent module.
+	 */
 	Node.Module = function (data, parent) {
 		this._package = data['package'];
 		this._files = data.files;
@@ -634,6 +555,8 @@ console.info('binding '+id);
 				this.children.push(new Node.Module(depData, this));
 			}
 		}
+
+		this.require.cache = {};
 
 		this.exports = {};
 	};
@@ -751,6 +674,11 @@ console.log('require file '+id, dep.path);
 
 			return exports;
 		},
+		/**
+		 * Run the module.
+		 * @param  {Object} opts Options for running. Ignored for the moment.
+		 * @return {Object}      The module exports.
+		 */
 		run: function (opts) {
 			var path = this.require('path');
 
@@ -784,9 +712,12 @@ console.log('require file '+id, dep.path);
 
 		return '';
 	};
-	Node.Module.prototype.require.cache = {};
-	Node.Module.prototype.require.extensions = []; // @deprecated
 
+	/**
+	 * Load a Node module.
+	 * @param  {String} moduleName The module name. Must be installed via `npm install <module>`.
+	 * @return {jQuery.Deferred}   The deferred object.
+	 */
 	Node.Module.load = function (moduleName) {
 		return loadCore().then(function () {
 			return $.ajax({
@@ -798,5 +729,6 @@ console.log('require file '+id, dep.path);
 		});
 	};
 
+	// Export API
 	global.Node = Node;
 }).call(this);
