@@ -30,7 +30,7 @@
 		document.getElementById('status').innerHTML += msg+'\n';
 	}
 	function uiReceived(msg) {
-		return uiStatus('<span style="color:green;">'+msg+'</span>');
+		return uiStatus('<span style="color:blue;">'+msg+'</span>');
 	}
 	function uiError(msg) {
 		return uiStatus('<span style="color:red;">'+msg+'</span>');
@@ -87,6 +87,7 @@
 							client.login(options.username, options.password, options.authType, function (err, status, lines) {
 								if (err) {
 									console.error(err);
+									uiError(err);
 									return;
 								}
 
@@ -109,10 +110,13 @@
 											});
 										});
 									});
-								} else if (status == 535) {
-									console.error('Auth error');
 								} else {
-									console.error('Unknown error', status, lines);
+									if (status == 535) {
+										console.error('Auth error');
+									} else {
+										console.error('Unknown error', status, lines);
+									}
+									uiError('['+status+'] Login failed: '+lines.join('\n'));
 								}
 							});
 						});
