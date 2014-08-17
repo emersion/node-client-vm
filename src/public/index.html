@@ -17,42 +17,44 @@
 
 	<p>Here is a simple demo: e-mail sending using <a href="https://github.com/substack/node-smtp-protocol">a pure Javascript implementation of the SMTP protocol</a>. The <code>smtp-protocol</code> module is run right in the browser, using pure Javascript core modules if available (such as <code>events</code>, <code>path</code>...), browser versions (<code>stream</code>, <code>buffer</code>...) or custom polyfills (<code>net</code>, <code>tls</code>). In this demo, we a re opening a TCP socket to the SMTP server. As we cannot open raw TCP connections from the browser directly, we are using a WebSocket connection to send the TCP data through a Node.js server (something like <em>SMTP-over-WebSockets</em>). Then the connection is upgraded to a secure TSL connection, using <a href="https://github.com/digitalbazaar/forge">a client-side TLS library</a>. We are now able to send SMTP commands to the server (<code>HELO</code>, <code>AUTH</code> and so on).</p>
 
-	<p>
-		<button id="send-email-btn">Send an e-mail</button>
-	</p>
+	<form id="send-email-form">
+		<label>SMTP server: <input type="text" name="hostname" value="smtp.gmail.com"></label><br>
+		<label>Port: <input type="number" name="port" value="587"></label><br>
+		<label>Username: <input type="text" name="username"></label><br>
+		<label>Password: <input type="password" name="password"></label><br><br>
 
-	<pre id="status" style="max-height: 200px; overflow: auto;"></pre>
+		<label>From: <input type="email" name="from"></label><br>
+		<label>To: <input type="email" name="to"></label><br>
+		<label>Body:<br><textarea name="body" cols="50" rows="10">From: the browser <browser@example.org>
+To: you <you@example.org>
+Subject: hello world
+
+Hello from your web browser!</textarea></label>
+
+		<p>
+			<button type="submit">Send an e-mail</button>
+		</p>
+
+		<small>Note that we're using an end-to-end encryption so the server cannot retrieve your username and password. If you don't trust us, read the source! ;-)</small>
+	</form>
+
+	<pre id="status" style="height: 300px; overflow: auto; background-color: black; color: lightgray;"></pre>
 
 	<script src="/bower_components/jquery/dist/jquery.min.js"></script>
 	<script src="/js/node-client-vm.js"></script>
 	<script>
 	function uiStatus(msg) {
-		document.getElementById('status').innerHTML += msg+'\n';
+		$('#status').append(msg+'\n');
 	}
 	function uiReceived(msg) {
-		return uiStatus('<span style="color:blue;">'+msg+'</span>');
+		return uiStatus('<span style="color:aqua;">'+msg+'</span>');
 	}
 	function uiError(msg) {
 		return uiStatus('<span style="color:red;">'+msg+'</span>');
 	}
 
-	var options = {
-		hostname: 'mail.gandi.net',
-		port: 587,
-		servername: 'emersion.fr',
-		username: '',
-		password: '',
-		authType: 'PLAIN',
-
-		from: 'contact@emersion.fr',
-		to: 'contact@emersion.fr',
-		body: 'From: the browser <browser@example.org>\n'+
-			'To: you <you@example.org>\n'+
-			'Subject: hello world\n\n'+
-			'Hello from your web browser!'
-	};
-
-	function sendEmail() {
+	function sendEmail(options) {
+		$('#status').empty();
 		uiStatus('Loading core modules and smtp-protocol...');
 
 		var startTime = (new Date()).getTime();
@@ -69,58 +71,63 @@
 					uiError(err);
 				});
 
-				uiStatus('Waiting greeting...');
 				client.on('greeting', function (code, lines) {
 					uiReceived(code+' '+lines.join('\n'));
+				});
 
-					uiStatus('Saying HELO...');
-					client.helo(options.servername, function (err) {
-						uiStatus('Upgrading to a secure TLS connection...');
-						client.on('tls', function () {
-							uiStatus('Connected with TLS!');
+				uiStatus('Saying HELO...');
+				client.helo(options.servername, function (err) {
+					uiStatus('Upgrading to a secure TLS connection...');
+					client.on('tls', function () {
+						uiStatus('Connected with TLS!');
 
-							client.stream.on('data', function (data) {
-								uiReceived(data);
-							});
+						client.stream.on('data', function (data) {
+							uiReceived(data);
+						});
+						client.stream.on('end', function (data) {
+							uiStatus('Socket closed.');
+						});
 
-							uiStatus('Logging in...');
-							client.login(options.username, options.password, options.authType, function (err, status, lines) {
-								if (err) {
-									console.error(err);
-									uiError(err);
-									return;
-								}
+						uiStatus('Logging in...');
+						client.login(options.username, options.password, options.authType, function (err, status, lines) {
+							if (err) {
+								console.error(err);
+								uiError(err);
+								return;
+							}
 
-								if (status == 235) {
-									uiStatus('Logged in!');
+							if (status == 235) {
+								uiStatus('Logged in!');
 
-									uiStatus('Now sending a message...');
-									client.from(options.from, function (err) {
-										client.to(options.to, function (err) {
-											client.data(function (err) {
-												var stream = client.message();
-												stream.write(options.body);
-												stream.end();
+								uiStatus('Now sending a message...');
+								client.from(options.from, function (err) {
+									client.to(options.to, function (err) {
+										client.data(function (err) {
+											var stream = client.message();
+											stream.write(options.body);
+											stream.end();
 
-												uiStatus('Sent! Now disconnecting...');
-												client.quit();
+											uiStatus('Sent! Now disconnecting...');
+											client.quit();
 
-												var endTime = (new Date()).getTime();
-												uiStatus('Time: '+(endTime - startTime)+'ms');
-											});
+											var endTime = (new Date()).getTime();
+											uiStatus('Time: '+(endTime - startTime)+'ms');
 										});
 									});
+								});
+							} else {
+								if (status == 535) {
+									console.error('Auth error');
 								} else {
-									if (status == 535) {
-										console.error('Auth error');
-									} else {
-										console.error('Unknown error', status, lines);
-									}
-									uiError('['+status+'] Login failed: '+lines.join('\n'));
+									console.error('Unknown error', status, lines);
 								}
-							});
+								uiError('['+status+'] Login failed: '+lines.join('\n'));
+							}
 						});
-						client.startTLS();
+					});
+					client.startTLS({
+						servername: options.hostname,
+						rejectUnauthorized: true
 					});
 				});
 
@@ -132,8 +139,43 @@
 		});
 	}
 
-	document.getElementById('send-email-btn').addEventListener('click', function () {
-		sendEmail();
+	$('#send-email-form').submit(function (e) {
+		e.preventDefault();
+
+		var options = {
+			hostname: '',
+			port: 25,
+			servername: window.location.hostname,
+			username: '',
+			password: '',
+			authType: 'PLAIN',
+
+			from: 'contact@emersion.fr',
+			to: 'contact@emersion.fr',
+			body: 'From: the browser <browser@example.org>\n'+
+				'To: you <you@example.org>\n'+
+				'Subject: hello world\n\n'+
+				'Hello from your web browser!'
+		};
+
+		$(this).find('input,select,textarea').each(function () {
+			var name = $(this).attr('name');
+
+			if (name) {
+				var value = $(this).val();
+				switch ($(this).attr('type')) {
+					case 'number':
+						value = parseInt(value, 10);
+						break;
+				}
+
+				if (value) {
+					options[name] = value;
+				}
+			}
+		});
+
+		sendEmail(options);
 	});
 	</script>
 </body>

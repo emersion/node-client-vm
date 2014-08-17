@@ -11,6 +11,15 @@ module.exports = function (server) {
 		var handle = new TCP();
 
 		var connectReq = handle.connect.apply(handle, req.body);
+
+		if (!connectReq) {
+			res.status(500).send({
+				code: 500,
+				error: 'Cannot connect to server'
+			});
+			return;
+		}
+
 		connectReq.oncomplete = function (status, handle, req, readable, writable) {
 			//TODO: generate a token
 			handles[handle.fd] = handle;
@@ -49,14 +58,14 @@ console.log('Unknown TCP connection "'+fd+'"');
 			}
 
 			req.oncomplete = function () {
-				console.log('Sent data ('+data.length+')', data);
+				console.log('Sent ('+data.length+')', data.toString());
 			};
 		});
 		handle.onread = function (buffer, offset, length) {
 			var end = offset + length;
 
 			if (buffer) {
-console.log('Received ('+length+'): ', buffer.slice(offset, end));
+				console.log('Received ('+length+'): ', buffer.slice(offset, end).toString());
 				socket.send(buffer.slice(offset, end));
 			} else if (process._errno == 'EOF') {
 				socket.close();
