@@ -102,35 +102,6 @@
 
 			return timer;
 		})();
-		native.cares_wrap = (function () {
-			//TODO: https://github.com/joyent/node/blob/master/src/cares_wrap.cc
-			var cares = {};
-
-			cares.queryA = function () {};
-			cares.queryAaaa = function () {};
-			cares.queryCname = function () {};
-			cares.queryMx = function () {};
-			cares.queryNs = function () {};
-			cares.queryTxt = function () {};
-			cares.querySrv = function () {};
-			cares.queryNaptr = function () {};
-			cares.querySoa = function () {};
-			cares.getHostByAddr = function () {};
-
-			cares.getaddrinfo = function () {
-				/*wrap('/cares/getaddrinfo', arguments).then(function (result) {
-					console.log(result);
-				});*/
-			};
-			cares.getnameinfo = function () {};
-			cares.isIP = function () {};
-
-			cares.strerror = function () {};
-			cares.getServers = function () {};
-			cares.setServers = function () {};
-
-			return cares;
-		})();
 		native.uv = (function () {
 			//TODO: https://github.com/joyent/node/blob/master/src/uv.cc
 			var uv = {};
