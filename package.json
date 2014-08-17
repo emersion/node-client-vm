@@ -1,0 +1,35 @@
+{
+  "name": "node-client-vm",
+  "version": "0.0.1",
+  "description": "A client-side virtual machine for Node.js.",
+  "main": "src/server.js",
+  "scripts": {
+    "test": "grunt test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/emersion/node-client-vm.git"
+  },
+  "keywords": [
+    "node",
+    "vm",
+    "client"
+  ],
+  "author": "Emersion <contact@emersion.fr>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/emersion/node-client-vm/issues"
+  },
+  "homepage": "https://github.com/emersion/node-client-vm",
+  "dependencies": {
+    "body-parser": "^1.4.3",
+    "buffer": "^2.5.0",
+    "crypto-browserify": "^3.0.1",
+    "errorhandler": "^1.1.1",
+    "events": "^1.0.1",
+    "express": "^4.5.1",
+    "express-ws": "^0.1.0",
+    "node-forge": "^0.6.12",
+    "q": "^1.0.1"
+  }
+}

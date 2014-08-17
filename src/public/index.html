@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Node client virtual machine</title>
+</head>
+<body>
+	<h1>Node client virtual machine</h1>
+	<h2>Running Node.js modules in the browser</h2>
+
+	<ul>
+		<li><a href="https://github.com/emersion/node-client-vm">Github project</a></li>
+		<li><a href="https://github.com/emersion">Author</a></li>
+	</ul>
+
+	<p>The aim of this project is to run any Node.js module in the browser.</p>
+
+	<p>Here is a simple demo: e-mail sending using <a href="https://github.com/substack/node-smtp-protocol">a pure Javascript implementation of the SMTP protocol</a>. The <code>smtp-protocol</code> module is run right in the browser, using pure Javascript core modules if available (such as <code>events</code>, <code>path</code>...), browser versions (<code>stream</code>, <code>buffer</code>...) or custom polyfills (<code>net</code>, <code>tls</code>). In this demo, we a re opening a TCP socket to the SMTP server. As we cannot open raw TCP connections from the browser directly, we are using a WebSocket connection to send the TCP data through a Node.js server (something like <em>SMTP-over-WebSockets</em>). Then the connection is upgraded to a secure TSL connection, using <a href="https://github.com/digitalbazaar/forge">a client-side TLS library</a>. We are now able to send SMTP commands to the server (<code>HELO</code>, <code>AUTH</code> and so on).</p>
+
+	<p>
+		<button id="send-email-btn">Send an e-mail</button>
+	</p>
+
+	<pre id="status" style="max-height: 200px; overflow: auto;"></pre>
+
+	<script src="/bower_components/jquery/dist/jquery.min.js"></script>
+	<script src="/js/node-client-vm.js"></script>
+	<script>
+	function uiStatus(msg) {
+		document.getElementById('status').innerHTML += msg+'\n';
+	}
+	function uiReceived(msg) {
+		return uiStatus('<span style="color:green;">'+msg+'</span>');
+	}
+	function uiSent(msg) {
+		return uiStatus('<span style="color:red;">'+msg+'</span>');
+	}
+
+	var options = {
+		hostname: 'mail.gandi.net',
+		port: 587,
+		servername: 'emersion.fr',
+		username: '',
+		password: '',
+		authType: 'PLAIN',
+
+		from: 'contact@emersion.fr',
+		to: 'contact@emersion.fr',
+		body: 'From: the browser <browser@example.org>\n'+
+			'To: you <you@example.org>\n'+
+			'Subject: hello world\n\n'+
+			'Hello from your web browser!'
+	};
+
+	function sendEmail() {
+		uiStatus('Loading core modules and smtp-protocol...');
+
+		var startTime = (new Date()).getTime();
+		Node.Module.load('smtp-protocol').then(function (module) {
+			var smtp = module.run();
+			uiStatus('SMTP module initialized!');
+
+			uiStatus('Connecting to SMTP server '+options.hostname+':'+options.port);
+			smtp.connect(options.hostname, options.port, function (client) {
+				uiStatus('Connected with TCP!');
+
+				client.on('error', function (err) {
+					console.warn('[smtp] error:', err);
+				});
+
+				uiStatus('Waiting greeting...');
+				client.on('greeting', function (code, lines) {
+					uiReceived(code+' '+lines.join('\n'));
+
+					uiStatus('Saying HELO...');
+					client.helo(options.servername, function (err) {
+						uiStatus('Upgrading to a secure TLS connection...');
+						client.on('tls', function () {
+							uiStatus('Connected with TLS!');
+
+							client.stream.on('data', function (data) {
+								uiReceived(data);
+							});
+
+							uiStatus('Logging in...');
+							client.login(options.username, options.password, options.authType, function (err, status, lines) {
+								if (err) {
+									console.error(err);
+									return;
+								}
+
+								if (status == 235) {
+									uiStatus('Logged in!');
+
+									uiStatus('Now sending a message...');
+									client.from(options.from, function (err) {
+										client.to(options.to, function (err) {
+											client.data(function (err) {
+												var stream = client.message();
+												stream.write(options.body);
+												stream.end();
+
+												uiStatus('Sent! Now disconnecting...');
+												client.quit();
+
+												var endTime = (new Date()).getTime();
+												uiStatus('Time: '+(endTime - startTime)+'ms');
+											});
+										});
+									});
+								} else if (status == 535) {
+									console.error('Auth error');
+								} else {
+									console.error('Unknown error', status, lines);
+								}
+							});
+						});
+						client.startTLS();
+					});
+				});
+
+				// Export client to let the user play with it from the web console
+				window.client = client;
+			});
+		});
+	}
+
+	document.getElementById('send-email-btn').addEventListener('click', function () {
+		sendEmail();
+	});
+	</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "node-client-vm",
+  "version": "0.0.1",
+  "authors": [
+    "Emersion <contact@emersion.fr>"
+  ],
+  "description": "A client-side virtual machine for Node.js.",
+  "keywords": [
+    "node",
+    "vm",
+    "client"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/emersion/node-client-vm",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "~2.1.1"
+  }
+}
