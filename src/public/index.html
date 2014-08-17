@@ -71,63 +71,64 @@ Hello from your web browser!</textarea></label>
 					uiError(err);
 				});
 
+				uiStatus('Waiting for greeting...');
 				client.on('greeting', function (code, lines) {
 					uiReceived(code+' '+lines.join('\n'));
-				});
 
-				uiStatus('Saying HELO...');
-				client.helo(options.servername, function (err) {
-					uiStatus('Upgrading to a secure TLS connection...');
-					client.on('tls', function () {
-						uiStatus('Connected with TLS!');
+					uiStatus('Saying HELO...');
+					client.helo(options.servername, function (err) {
+						uiStatus('Upgrading to a secure TLS connection...');
+						client.on('tls', function () {
+							uiStatus('Connected with TLS!');
 
-						client.stream.on('data', function (data) {
-							uiReceived(data);
-						});
-						client.stream.on('end', function (data) {
-							uiStatus('Socket closed.');
-						});
+							client.stream.on('data', function (data) {
+								uiReceived(data);
+							});
+							client.stream.on('end', function (data) {
+								uiStatus('Socket closed.');
+							});
 
-						uiStatus('Logging in...');
-						client.login(options.username, options.password, options.authType, function (err, status, lines) {
-							if (err) {
-								console.error(err);
-								uiError(err);
-								return;
-							}
+							uiStatus('Logging in...');
+							client.login(options.username, options.password, options.authType, function (err, status, lines) {
+								if (err) {
+									console.error(err);
+									uiError(err);
+									return;
+								}
 
-							if (status == 235) {
-								uiStatus('Logged in!');
+								if (status == 235) {
+									uiStatus('Logged in!');
 
-								uiStatus('Now sending a message...');
-								client.from(options.from, function (err) {
-									client.to(options.to, function (err) {
-										client.data(function (err) {
-											var stream = client.message();
-											stream.write(options.body);
-											stream.end();
+									uiStatus('Now sending a message...');
+									client.from(options.from, function (err) {
+										client.to(options.to, function (err) {
+											client.data(function (err) {
+												var stream = client.message();
+												stream.write(options.body);
+												stream.end();
 
-											uiStatus('Sent! Now disconnecting...');
-											client.quit();
+												uiStatus('Sent! Now disconnecting...');
+												client.quit();
 
-											var endTime = (new Date()).getTime();
-											uiStatus('Time: '+(endTime - startTime)+'ms');
+												var endTime = (new Date()).getTime();
+												uiStatus('Time: '+(endTime - startTime)+'ms');
+											});
 										});
 									});
-								});
-							} else {
-								if (status == 535) {
-									console.error('Auth error');
 								} else {
-									console.error('Unknown error', status, lines);
+									if (status == 535) {
+										console.error('Auth error');
+									} else {
+										console.error('Unknown error', status, lines);
+									}
+									uiError('['+status+'] Login failed: '+lines.join('\n'));
 								}
-								uiError('['+status+'] Login failed: '+lines.join('\n'));
-							}
+							});
 						});
-					});
-					client.startTLS({
-						servername: options.hostname,
-						rejectUnauthorized: true
+						client.startTLS({
+							servername: options.hostname,
+							rejectUnauthorized: true
+						});
 					});
 				});
 
