@@ -19,7 +19,7 @@
   "homepage": "https://github.com/emersion/node-client-vm",
   "main": "src/server.js",
   "scripts": {
-    "postinstall": "npm install smtp-protocol"
+    "postinstall": "npm install smtp-protocol imap"
   },
   "dependencies": {
     "body-parser": "^1.4.3",
