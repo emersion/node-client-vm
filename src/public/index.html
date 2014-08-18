@@ -3,44 +3,48 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Node client virtual machine</title>
+
+	<link rel="stylesheet" href="/bower_components/bootstrap/dist/css/bootstrap.min.css">
 </head>
 <body>
-	<h1>Node client virtual machine</h1>
-	<h2>Running Node.js modules in the browser!</h2>
+	<div class="container">
+		<h1>Node client virtual machine <small>- running Node.js modules in the browser!</small></h1>
 
-	<ul>
-		<li><a href="https://github.com/emersion/node-client-vm">Github project</a></li>
-		<li><a href="https://github.com/emersion">Author</a></li>
-	</ul>
+		<ul>
+			<li><a href="https://github.com/emersion/node-client-vm">Github project</a></li>
+			<li><a href="https://github.com/emersion">Author</a></li>
+		</ul>
 
-	<p>The aim of this project is to run any Node.js module in the browser.</p>
+		<p>The aim of this project is to run any Node.js module in the browser.</p>
 
-	<p>Here is a simple demo: e-mail sending using <a href="https://github.com/substack/node-smtp-protocol">a pure Javascript implementation of the SMTP protocol</a>. The <code>smtp-protocol</code> module is run right in the browser, using pure Javascript core modules if available (such as <code>events</code>, <code>path</code>...), browser versions (<code>stream</code>, <code>buffer</code>...) or custom polyfills (<code>net</code>, <code>tls</code>). In this demo, we a re opening a TCP socket to the SMTP server. As we cannot open raw TCP connections from the browser directly, we are using a WebSocket connection to send the TCP data through a Node.js server (something like <em>SMTP-over-WebSockets</em>). Then the connection is upgraded to a secure TSL connection, using <a href="https://github.com/digitalbazaar/forge">a client-side TLS library</a>. We are now able to send SMTP commands to the server (<code>HELO</code>, <code>AUTH</code> and so on).</p>
+		<p>Here is a simple demo: e-mail sending using <a href="https://github.com/substack/node-smtp-protocol">a pure Javascript implementation of the SMTP protocol</a>. The <code>smtp-protocol</code> module is run right in the browser, using pure Javascript core modules if available (such as <code>events</code>, <code>path</code>...), browser versions (<code>stream</code>, <code>buffer</code>...) or custom polyfills (<code>net</code>, <code>tls</code>). In this demo, we a re opening a TCP socket to the SMTP server. As we cannot open raw TCP connections from the browser directly, we are using a WebSocket connection to send the TCP data through a Node.js server (something like <em>SMTP-over-WebSockets</em>). Then the connection is upgraded to a secure TSL connection, using <a href="https://github.com/digitalbazaar/forge">a client-side TLS library</a>. We are now able to send SMTP commands to the server (<code>HELO</code>, <code>AUTH</code> and so on).</p>
 
-	<form id="send-email-form">
-		<label>SMTP server: <input type="text" name="hostname" value="smtp.gmail.com"></label><br>
-		<label>Port: <input type="number" name="port" value="587"></label><br>
-		<label>Username: <input type="text" name="username"></label><br>
-		<label>Password: <input type="password" name="password"></label><br><br>
+		<form id="send-email-form">
+			<label>SMTP server: <input type="text" name="hostname" value="smtp.gmail.com"></label><br>
+			<label>Port: <input type="number" name="port" value="587"></label><br>
+			<label>Username: <input type="text" name="username"></label><br>
+			<label>Password: <input type="password" name="password"></label><br><br>
 
-		<label>From: <input type="email" name="from"></label><br>
-		<label>To: <input type="email" name="to"></label><br>
-		<label>Body:<br><textarea name="body" cols="50" rows="10">From: the browser <browser@example.org>
+			<label>From: <input type="email" name="from"></label><br>
+			<label>To: <input type="email" name="to"></label><br>
+			<label>Body:<br><textarea name="body" cols="50" rows="10">From: the browser <browser@example.org>
 To: you <you@example.org>
 Subject: hello world
 
 Hello from your web browser!</textarea></label>
 
-		<p>
-			<button type="submit">Send an e-mail</button>
-		</p>
+			<p>
+				<button type="submit" class="btn btn-primary">Send an e-mail</button>
+			</p>
 
-		<small>Note that we're using an end-to-end encryption so the server cannot retrieve your username and password. If you don't trust us, read the source! ;-)</small>
-	</form>
+			<small>Note that we're using an end-to-end encryption so the server cannot retrieve your username and password. If you don't trust us, read the source! ;-)</small>
+		</form>
 
-	<pre id="status" style="height: 300px; overflow: auto; background-color: black; color: lightgray;"></pre>
+		<pre id="status" style="height: 300px; overflow: auto; background-color: black; color: lightgray;"></pre>
+	</div>
 
 	<script src="/bower_components/jquery/dist/jquery.min.js"></script>
+	<script src="/bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
 	<script src="/js/node-client-vm.js"></script>
 	<script>
 	function uiStatus(msg) {
@@ -61,6 +65,9 @@ Hello from your web browser!</textarea></label>
 		Node.Module.load('smtp-protocol').then(function (module) {
 			var smtp = module.run();
 			uiStatus('SMTP module initialized!');
+
+			var endTime = (new Date()).getTime();
+			uiStatus('Loading time: '+(endTime - startTime)+'ms');
 
 			uiStatus('Connecting to SMTP server '+options.hostname+':'+options.port);
 			smtp.connect(options.hostname, options.port, function (client) {
@@ -109,9 +116,6 @@ Hello from your web browser!</textarea></label>
 
 												uiStatus('Sent! Now disconnecting...');
 												client.quit();
-
-												var endTime = (new Date()).getTime();
-												uiStatus('Time: '+(endTime - startTime)+'ms');
 											});
 										});
 									});
