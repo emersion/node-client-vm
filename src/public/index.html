@@ -17,13 +17,15 @@
 
 		<p>The aim of this project is to run any Node.js module in the browser.</p>
 
-		<p>Here is a simple demo: e-mail sending using <a href="https://github.com/substack/node-smtp-protocol">a pure Javascript implementation of the SMTP protocol</a>. The <code>smtp-protocol</code> module is run right in the browser, using pure Javascript core modules if available (such as <code>events</code>, <code>path</code>...), browser versions (<code>stream</code>, <code>buffer</code>...) or custom polyfills (<code>net</code>, <code>tls</code>). In this demo, we a re opening a TCP socket to the SMTP server. As we cannot open raw TCP connections from the browser directly, we are using a WebSocket connection to send the TCP data through a Node.js server (something like <em>SMTP-over-WebSockets</em>). Then the connection is upgraded to a secure TSL connection, using <a href="https://github.com/digitalbazaar/forge">a client-side TLS library</a>. We are now able to send SMTP commands to the server (<code>HELO</code>, <code>AUTH</code> and so on).</p>
+		<p>Here is a simple demo: e-mail sending using <a href="https://github.com/substack/node-smtp-protocol">a pure Javascript implementation of the SMTP protocol</a>. The <code>smtp-protocol</code> module is run right in the browser, using pure Javascript core modules if available (such as <code>events</code>, <code>path</code>...), browser versions (<code>stream</code>, <code>buffer</code>...) or custom polyfills (<code>net</code>, <code>tls</code>). In this demo, we a re opening a TCP socket to the SMTP server. As we cannot open raw TCP connections from the browser directly, we are using a WebSocket connection to send the TCP data through a Node.js server (something like <em>SMTP-over-WebSockets</em>). Then the connection is upgraded to a secure TLS connection, using <a href="https://github.com/digitalbazaar/forge">a client-side TLS library</a>. We are now able to send SMTP commands to the server (<code>HELO</code>, <code>AUTH</code> and so on).</p>
 
 		<form id="send-email-form">
 			<label>SMTP server: <input type="text" name="hostname" value="smtp.gmail.com"></label><br>
 			<label>Port: <input type="number" name="port" value="587"></label><br>
 			<label>Username: <input type="text" name="username"></label><br>
-			<label>Password: <input type="password" name="password"></label><br><br>
+			<label>Password: <input type="password" name="password"></label><br>
+			<label><input type="checkbox" name="rejectUnauthorized" checked> Check SSL certificate</label><br><br>
+
 
 			<label>From: <input type="email" name="from"></label><br>
 			<label>To: <input type="email" name="to"></label><br>
@@ -131,7 +133,7 @@ Hello from your web browser!</textarea></label>
 						});
 						client.startTLS({
 							servername: options.hostname,
-							rejectUnauthorized: true
+							rejectUnauthorized: options.rejectUnauthorized
 						});
 					});
 				});
@@ -171,6 +173,9 @@ Hello from your web browser!</textarea></label>
 				switch ($(this).attr('type')) {
 					case 'number':
 						value = parseInt(value, 10);
+						break;
+					case 'checkbox':
+						value = $(this).prop('checked');
 						break;
 				}
 
