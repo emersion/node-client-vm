@@ -1,3 +1,4 @@
+var net = require('net');
 var Stream = require('stream');
 var forge = require('node-forge');
 
@@ -9,7 +10,12 @@ exports.connect = function (options, callback) {
 		throw new Error('tls.connect() without providing a socket is not supported for the moment');
 	}
 
-	var socket = options.socket;
+	// Create a new socket so as to prevent old socket listeners to catch encrypted data
+	// TODO: implement TLSSocket
+	var socket = new net.Socket({
+		handle: options.socket._handle
+	});
+	socket.encrypted = true;
 
 	var cleartextStream = new Stream;
 	cleartextStream.readable = true;
@@ -79,6 +85,15 @@ exports.connect = function (options, callback) {
 	cleartextStream.destroy = function () {
 		destroy.end();
 	};
+
+	// Forward events from cleartextStream to options.socket
+	// Unencrypted messages are sent to the original socket
+	cleartextStream.on('data', function (data) {
+		options.socket.emit('data', data);
+	});
+	cleartextStream.on('end', function (data) {
+		options.socket.emit('end', data);
+	});
 
 	return cleartextStream;
 };

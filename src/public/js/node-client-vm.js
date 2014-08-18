@@ -146,8 +146,10 @@
 					this._ws.addEventListener('message', function (e) {
 						var contents = e.data;
 
+						// TODO: store data in Buffer if not reading
 						if (typeof that.onread == 'function' && that._reading) {
 							var gotBuffer = function (buffer) {
+								//console.log('[tcp] received: ' + buffer.toString('utf8'));
 								that.onread(buffer, 0, buffer.length);
 							};
 
@@ -175,7 +177,7 @@
 							that.owner.emit('_socketEnd');
 						}
 					});
-console.log(this);
+
 					return deferred;
 				},
 
@@ -201,7 +203,18 @@ console.log(this);
 					this._reading = false;
 				},
 				shutdown: function () {
-					console.warn('shutdown');
+					var that = this;
+					var req = {};
+
+					this.close();
+
+					// TODO: wait for the close event?
+					setTimeout(function () {
+						//console.log('[tcp] shutdown');
+						req.oncomplete(0, that, req);
+					}, 0);
+
+					return req;
 				},
 
 				writeBuffer: function (buf) {
@@ -212,6 +225,7 @@ console.log(this);
 
 					// TODO: wait for a confirm message from server?
 					setTimeout(function () {
+						//console.log('[tcp] sent: ' + buf.toString('utf8'));
 						req.oncomplete(0, that, req);
 					}, 0);
 
