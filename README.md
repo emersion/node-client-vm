@@ -23,4 +23,4 @@ Hacking
 
 You can edit [`src/public/index.html`](https://github.com/emersion/node-client-vm/blob/master/src/public/index.html) to change SMTP server and credentials.
 
-You can also take a look at [`src/public/js/node-client-vm.js`](https://github.com/emersion/node-client-vm/blob/master/src/public/js/node-client-vm.js) for the client code. Client modules are in [`src/lib/core-vm/`](https://github.com/emersion/node-client-vm/tree/master/src/lib/core-vm).
+You can also have a look at [`src/public/js/node-client-vm.js`](https://github.com/emersion/node-client-vm/blob/master/src/public/js/node-client-vm.js) for the client code. Client modules are in [`src/lib/core-vm/`](https://github.com/emersion/node-client-vm/tree/master/src/lib/core-vm).
