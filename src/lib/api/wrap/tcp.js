@@ -1,10 +1,16 @@
 var express = require('express');
 var expressWs = require('express-ws');
+var crypto = require('crypto');
+
+function generateToken() {
+	return crypto.randomBytes(32).toString('hex');
+}
 
 module.exports = function (server) {
 	var app = express();
 
 	var handles = {};
+
 	app.post('/connect', function (req, res) {
 		var TCP = process.binding('tcp_wrap').TCP;
 
@@ -21,10 +27,18 @@ module.exports = function (server) {
 		}
 
 		connectReq.oncomplete = function (status, handle, req, readable, writable) {
-			//TODO: generate a token
-			handles[handle.fd] = handle;
+			// Generate a token for this connection
+			var token = generateToken();
+
+			if (status == 0) {
+				handles[token] = handle;
+			}
 
 			var args = Array.prototype.slice.call(arguments);
+
+			// Change handle, do not send fd, send the token
+			args[1] = { token: token };
+
 			res.send(args);
 		};
 	});
@@ -32,22 +46,18 @@ module.exports = function (server) {
 	var wss = expressWs(app, server);
 
 	app.ws('/api/vm/wrap/tcp/socket', function (socket, req) {
-console.log('connection!');
+		var token = req.query.token;
 
-		var fd = parseInt(req.query.fd, 10);
-
-		if (!handles[fd]) {
-			/*socket.send(JSON.stringify({
-				code: 404,
-				error: 'Unknown TCP connection "'+fd+'"'
-			}));*/
-console.log('Unknown TCP connection "'+fd+'"');
+		if (!handles[token]) {
+			console.warn('Unknown TCP connection with token "'+token+'"');
 			socket.close();
 			return;
 		}
 
-		var handle = handles[fd];
+		var handle = handles[token];
 		//delete handles[fd];
+
+		console.log('Forwarding socket with token '+token);
 
 		socket.on('message', function (data) {
 			var req;
@@ -75,9 +85,9 @@ console.log('Unknown TCP connection "'+fd+'"');
 		};
 		socket.on('close', function () {
 			handle.close();
-			console.log('TCP connection closed');
+			console.log('Websocket connection closed ('+token+')');
 		});
-console.log(handle.constructor.prototype);
+
 		handle.readStart();
 	});
 

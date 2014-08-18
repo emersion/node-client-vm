@@ -126,7 +126,7 @@
 				this._reading = false;
 			};
 			tcp.TCP.prototype = {
-				_connectWebSocket: function () {
+				_connectWebSocket: function (token) {
 					var that = this;
 
 					if (this._ws) {
@@ -135,7 +135,7 @@
 
 					var deferred = $.Deferred();
 
-					this._ws = new WebSocket('ws://'+window.location.host+'/api/vm/wrap/tcp/socket?fd='+this.fd);
+					this._ws = new WebSocket('ws://'+window.location.host+'/api/vm/wrap/tcp/socket?token='+token);
 					this._ws.addEventListener('open', function () {
 						console.log('TCP OK');
 						deferred.resolveWith(that._ws);
@@ -256,17 +256,20 @@
 
 					var req = {};
 					wrap('/tcp/connect', arguments).then(function (results) {
-						var handle = results[1];
-						that.fd = handle.fd;
-
+						var status = results[0],
+							handle = results[1];
 						results[1] = that;
 						results[2] = req;
 
-						that._connectWebSocket().then(function () {
+						if (status == 0) {
+							that._connectWebSocket(handle.token).then(function () {
+								req.oncomplete.apply(req, results);
+							}, function () {
+								req.oncomplete('Cannot open TCP socket: unable to open WebSocket');
+							});
+						} else {
 							req.oncomplete.apply(req, results);
-						}, function () {
-							req.oncomplete('Cannot open TCP socket: unable to open WebSocket');
-						});
+						}
 					});
 					return req;
 				},
