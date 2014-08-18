@@ -19,44 +19,131 @@
 
 		<p>Here is a simple demo: e-mail sending using <a href="https://github.com/substack/node-smtp-protocol">a pure Javascript implementation of the SMTP protocol</a>. The <code>smtp-protocol</code> module is run right in the browser, using pure Javascript core modules if available (such as <code>events</code>, <code>path</code>...), browser versions (<code>stream</code>, <code>buffer</code>...) or custom polyfills (<code>net</code>, <code>tls</code>). In this demo, we a re opening a TCP socket to the SMTP server. As we cannot open raw TCP connections from the browser directly, we are using a WebSocket connection to send the TCP data through a Node.js server (something like <em>SMTP-over-WebSockets</em>). Then the connection is upgraded to a secure TLS connection, using <a href="https://github.com/digitalbazaar/forge">a client-side TLS library</a>. We are now able to send SMTP commands to the server (<code>HELO</code>, <code>AUTH</code> and so on).</p>
 
-		<form id="send-email-form">
-			<label>SMTP server: <input type="text" name="hostname" value="smtp.gmail.com"></label><br>
-			<label>Port: <input type="number" name="port" value="587"></label><br>
-			<label>Username: <input type="text" name="username"></label><br>
-			<label>Password: <input type="password" name="password"></label><br>
-			<label><input type="checkbox" name="rejectUnauthorized" checked> Check SSL certificate</label><br><br>
+		<!-- Nav tabs -->
+		<ul class="nav nav-tabs" role="tablist">
+			<li class="active"><a href="#live-smtp" role="tab" data-toggle="tab">SMTP</a></li>
+			<li><a href="#live-imap" role="tab" data-toggle="tab">IMAP</a></li>
+			<li><a href="#live-telnet" role="tab" data-toggle="tab">Telnet</a></li>
+		</ul>
+
+		<!-- Tab panes -->
+		<div class="tab-content">
+			<div class="tab-pane active" id="live-smtp">
+				<form id="smtp-form">
+					<br>
+					<label>SMTP server: <input type="text" name="hostname" value="smtp.gmail.com"></label><br>
+					<label>Port: <input type="number" name="port" value="587"></label><br>
+					<label>Username: <input type="text" name="username"></label><br>
+					<label>Password: <input type="password" name="password"></label><br>
+					<label><input type="checkbox" name="rejectUnauthorized" checked> Check SSL certificate</label><br><br>
 
 
-			<label>From: <input type="email" name="from"></label><br>
-			<label>To: <input type="email" name="to"></label><br>
-			<label>Body:<br><textarea name="body" cols="50" rows="10">From: the browser <browser@example.org>
-To: you <you@example.org>
-Subject: hello world
+					<label>From: <input type="email" name="from"></label><br>
+					<label>To: <input type="email" name="to"></label><br>
+					<label>Body:<br><textarea name="body" cols="50" rows="10">From: the browser <browser@example.org>
+		To: you <you@example.org>
+		Subject: hello world
 
-Hello from your web browser!</textarea></label>
+		Hello from your web browser!</textarea></label>
 
-			<p>
-				<button type="submit" class="btn btn-primary">Send an e-mail</button>
-			</p>
+					<p>
+						<button type="submit" class="btn btn-primary">Send an e-mail</button>
+					</p>
 
-			<small>Note that we're using an end-to-end encryption so the server cannot retrieve your username and password. If you don't trust us, read the source! ;-)</small>
-		</form>
+					<small>Note that we're using an end-to-end encryption so the server cannot retrieve your username and password. If you don't trust us, read the source! ;-)</small>
+				</form>
+			</div>
+			<div class="tab-pane" id="live-imap">
+				<form id="imap-form">
+					<br>
+					<label>IMAP server: <input type="text" name="hostname" value="imap.gmail.com"></label><br>
+					<label>Port: <input type="number" name="port" value="993"></label><br>
+					<label>Username: <input type="text" name="username"></label><br>
+					<label>Password: <input type="password" name="password"></label><br>
+					<label><input type="checkbox" name="rejectUnauthorized" checked> Check SSL certificate</label><br><br>
 
-		<pre id="status" style="height: 300px; overflow: auto; background-color: black; color: lightgray;"></pre>
+					<p>
+						<button type="submit" class="btn btn-primary">Get 3 emails from my inbox</button>
+					</p>
+
+					<small>Note that we're using an end-to-end encryption so the server cannot retrieve your username and password. If you don't trust us, read the source! ;-)</small>
+				</form>
+			</div>
+			<div class="tab-pane" id="live-telnet">
+				<form id="telnet-form">
+					<br>
+					<label>Server: <input type="text" name="hostname" value="towel.blinkenlights.nl"></label><br>
+					<label>Port: <input type="number" name="port" value="23"></label><br>
+
+					<p>
+						<button type="submit" class="btn btn-primary">Telnet</button>
+					</p>
+
+					<small><a href="http://www.telnet.org/htm/places.htm">Other Telnet servers</a></small>
+				</form>
+
+				<form id="telnet-cmd-form">
+					<input type="text" name="cmd" placeholder="> Enter commands here">
+					<button type="submit" class="btn btn-primary">Send</button>
+				</form>
+			</div>
+		</div>
+
+		<pre id="status" style="height: 300px; overflow: auto; background-color: black; color: lightgray;">></pre>
 	</div>
 
 	<script src="/bower_components/jquery/dist/jquery.min.js"></script>
 	<script src="/bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
 	<script src="/js/node-client-vm.js"></script>
 	<script>
+	var $status = $('#status'), maxLength = 1024*32;
 	function uiStatus(msg) {
-		$('#status').append(msg+'\n');
+		msg += '\n';
+
+		var currentLength = $status[0].innerHTML.length + msg.length;
+		if (currentLength < maxLength) {
+			$status[0].innerHTML += msg;
+		} else {
+			$status[0].innerHTML = ($status[0].innerHTML + msg).substr(currentLength - maxLength, currentLength);
+		}
+
+		$status[0].scrollTop = $status[0].scrollHeight;
+	}
+	function uiStatusText(msg) {
+		var text = $('<span></span>').text(msg).html();
+		return uiStatus(text);
 	}
 	function uiReceived(msg) {
 		return uiStatus('<span style="color:aqua;">'+msg+'</span>');
 	}
+	function uiSent(msg) {
+		return uiStatus('<span style="color:yellow;">'+msg+'</span>');
+	}
 	function uiError(msg) {
 		return uiStatus('<span style="color:red;">'+msg+'</span>');
+	}
+
+	function populateOptions(form, options) {
+		$(form).find('input,select,textarea').each(function () {
+			var name = $(this).attr('name');
+
+			if (name) {
+				var value = $(this).val();
+				switch ($(this).attr('type')) {
+					case 'number':
+						value = parseInt(value, 10);
+						break;
+					case 'checkbox':
+						value = $(this).prop('checked');
+						break;
+				}
+
+				if (value) {
+					options[name] = value;
+				}
+			}
+		});
+		return options;
 	}
 
 	function sendEmail(options) {
@@ -145,8 +232,7 @@ Hello from your web browser!</textarea></label>
 			uiError(err);
 		});
 	}
-
-	$('#send-email-form').submit(function (e) {
+	$('#smtp-form').submit(function (e) {
 		e.preventDefault();
 
 		var options = {
@@ -165,27 +251,148 @@ Hello from your web browser!</textarea></label>
 				'Hello from your web browser!'
 		};
 
-		$(this).find('input,select,textarea').each(function () {
-			var name = $(this).attr('name');
-
-			if (name) {
-				var value = $(this).val();
-				switch ($(this).attr('type')) {
-					case 'number':
-						value = parseInt(value, 10);
-						break;
-					case 'checkbox':
-						value = $(this).prop('checked');
-						break;
-				}
-
-				if (value) {
-					options[name] = value;
-				}
-			}
-		});
+		populateOptions(this, options);
 
 		sendEmail(options);
+	});
+
+	function checkEmails(options) {
+		$('#status').empty();
+		uiStatus('Loading core modules and imap...');
+
+		var startTime = (new Date()).getTime();
+		Node.Module.load('imap').then(function (module) {
+			var Imap = module.run();
+			uiStatus('IMAP module initialized!');
+
+			var endTime = (new Date()).getTime();
+			uiStatus('Loading time: '+(endTime - startTime)+'ms');
+
+			var imap = new Imap({
+				user: options.username,
+				password: options.password,
+				host: options.hostname,
+				port: options.port,
+				tls: true
+			});
+
+			imap.once('ready', function() {
+				uiStatus('Connected to IMAP server!');
+				
+				imap.openBox('INBOX', true, function (err, box) {
+					if (err) {
+						uiStatus(err);
+						return;
+					}
+
+					var f = imap.seq.fetch('1:3', {
+						bodies: 'HEADER.FIELDS (FROM TO SUBJECT DATE)',
+						struct: true
+					});
+					f.on('message', function(msg, seqno) {
+						uiStatus('Message #' + seqno);
+						var prefix = '(#' + seqno + ') ';
+						msg.on('body', function(stream, info) {
+							var buffer = '';
+							stream.on('data', function(chunk) {
+								buffer += chunk.toString('utf8');
+							});
+							stream.once('end', function() {
+								var header = Imap.parseHeader(buffer);
+								console.log(prefix, 'Parsed header: ', header);
+								uiStatusText(prefix + ' Subject: ' + header.subject);
+								uiStatusText(prefix + ' From: ' + header.from);
+							});
+						});
+						msg.once('attributes', function(attrs) {
+							console.log(prefix, 'Attributes: ', attrs);
+						});
+						msg.once('end', function() {
+							uiStatus(prefix + 'Finished');
+						});
+					});
+					f.once('error', function(err) {
+						uiStatus('Fetch error: ' + err);
+					});
+					f.once('end', function() {
+						uiStatus('Done fetching all messages!');
+						imap.end();
+					});
+				});
+			});
+
+			imap.once('error', function(err) {
+				uiError(err);
+				console.warn(err);
+			});
+
+			imap.once('end', function() {
+				uiStatus('Connection ended');
+			});
+
+			uiStatus('Connecting to IMAP server '+options.hostname+':'+options.port);
+			imap.connect();
+		}, function (err) {
+			uiError(err);
+		});
+	}
+	$('#imap-form').submit(function (e) {
+		e.preventDefault();
+
+		var options = {
+			hostname: '',
+			port: 993,
+			servername: window.location.hostname,
+			username: '',
+			password: '',
+			authType: 'PLAIN',
+
+			folder: 'INBOX'
+		};
+
+		populateOptions(this, options);
+
+		checkEmails(options);
+	});
+
+	function tcpConnect(options) {
+		$('#status').empty();
+		uiStatus('Loading core modules...');
+		Node.Module.fromFile('/js/modules/telnet.js').then(function (module) {
+			var telnet = module.run();
+			uiStatus('Modules loaded! Now connecting to '+options.hostname+':'+options.port);
+
+			telnet.connect(options.hostname, options.port, function (client) {
+				uiStatus('Connected to server!');
+
+				var $cmd = $('#telnet-cmd-form input[name="cmd"').focus();
+				$('#telnet-cmd-form').off('submit').submit(function (e) {
+					e.preventDefault();
+
+					var cmd = $cmd.val();
+					client.write(cmd);
+					uiSent(cmd);
+
+					$cmd.val('').focus();
+				});
+
+				client.on('data', function (chunk) {
+					uiReceived(chunk.toString());
+				});
+			});
+		});
+	}
+	$('#telnet-form').submit(function (e) {
+		e.preventDefault();
+
+		var options = {
+			hostname: '',
+			port: 80
+		};
+
+		populateOptions(this, options);
+
+		tcpConnect(options);
 	});
 	</script>
 </body>

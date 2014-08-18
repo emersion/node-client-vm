@@ -68,14 +68,14 @@ module.exports = function (server) {
 			}
 
 			req.oncomplete = function () {
-				console.log('Sent ('+data.length+')', data.toString());
+				//console.log('Sent ('+data.length+')', data.toString());
 			};
 		});
 		handle.onread = function (buffer, offset, length) {
 			var end = offset + length;
 
 			if (buffer) {
-				console.log('Received ('+length+'): ', buffer.slice(offset, end).toString());
+				//console.log('Received ('+length+'): ', buffer.slice(offset, end).toString());
 				socket.send(buffer.slice(offset, end));
 			} else if (process._errno == 'EOF') {
 				socket.close();

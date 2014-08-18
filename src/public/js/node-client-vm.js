@@ -486,6 +486,26 @@
 		var parentExports = module.exports;
 		module.exports = {};
 
+		var bindingsObjName = '_node_module_context';
+		var parentModule, parentBindings;
+		var enterContext = function () {
+			parentModule = global['_node_module'];
+			parentBindings = global[bindingsObjName];
+
+			global['_node_module'] = module;
+			global[bindingsObjName] = bindings;
+		};
+		var leaveContext = function () {
+			global['_node_module'] = parentModule;
+			global[bindingsObjName] = parentBindings;
+		};
+		var require = function (id) {
+			enterContext();
+			var exports = module.require(id);
+			leaveContext();
+			return exports;
+		};
+
 		// Local scope
 		bindings = $.extend({
 			__filename: module.filename,
@@ -495,7 +515,7 @@
 			process: process,
 			console: global.console,
 			Buffer: Node.Buffer,
-			require: module.require.bind(module), // TODO: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function/bind#Browser_compatibility
+			require: require,
 			module: module,
 			exports: module.exports,
 
@@ -512,8 +532,7 @@
 		});
 
 		var argsNames = [],
-			argsValues = [],
-			bindingsObjName = '_node_module_context';
+			argsValues = [];
 		for (var bindingName in bindings) {
 			var bindingValue = bindings[bindingName];
 
@@ -521,19 +540,15 @@
 			argsValues.push(bindingsObjName + '.' + bindingName);
 		}
 
-		var parentModule = global['_node_module'],
-			parentBindings = global[bindingsObjName];
-
-		global['_node_module'] = module;
-		global[bindingsObjName] = bindings;
-
 		script = '(function ('+argsNames.join(', ')+') { '+
 			script+
 			'\n}).call(_node_module, '+argsValues.join(', ')+');'+
 			'\n//# sourceURL='+module.id+'/'+bindings.__filename;
 		//TODO: look for exports local variable and populate module.exports
 
+		enterContext();
 		$.globalEval(script);
+		leaveContext();
 
 		global['_node_module'] = parentModule;
 		global[bindingsObjName] = parentBindings;
@@ -575,11 +590,11 @@
 //console.log('require '+id);
 			var exports = {};
 
-			if (window._node_module_context && (id.substr(0, 2) == './' || id.substr(0, 3) == '../')) {
+			if (global._node_module_context && (id.substr(0, 2) == './' || id.substr(0, 3) == '../')) {
 				var path = this.require('path');
 
 				//TODO: do not use _node_module_context.__dirname
-				var resolved = path.resolve(_node_module_context.__dirname, id);
+				var resolved = path.resolve(global._node_module_context.__dirname, id);
 
 				// Relative to the current working directory
 				id = './'+path.relative(process.cwd(), resolved);
@@ -755,6 +770,37 @@
 			}).then(function (moduleData) {
 				return new Node.Module(moduleData);
 			});
+		});
+	};
+
+	/**
+	 * Create a Node module from a single script.
+	 * @param  {String} contents The script.
+	 * @param  {Object} options  Options.
+	 * @return {jQuery.Deferred}   The deferred object.
+	 */
+	Node.Module.fromString = function (contents, options) {
+		options = $.extend({
+			name: 'browser-module',
+			dependencies: {}
+		}, options);
+
+		return loadCore().then(function () {
+			return new Node.Module({
+				package: { name: options.name },
+				files: { 'index.js': contents },
+				dependencies: options.dependencies
+			});
+		});
+	};
+
+	Node.Module.fromFile = function (url, options) {
+		return $.ajax({
+			url: url,
+			type: 'get',
+			dataType: 'text'
+		}).then(function (contents) {
+			return Node.Module.fromString(contents, options);
 		});
 	};
 

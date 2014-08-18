@@ -2,23 +2,12 @@ var net = require('net');
 var Stream = require('stream');
 var forge = require('node-forge');
 
-exports.connect = function (options, callback) {
-	options = options || {};
-	callback = callback || function () {};
-
-	if (!options.socket) {
-		throw new Error('tls.connect() without providing a socket is not supported for the moment');
-	}
-
-	// Create a new socket so as to prevent old socket listeners to catch encrypted data
-	// TODO: implement TLSSocket
+function startTLS(options, cleartextStream, callback) {
 	var socket = new net.Socket({
 		handle: options.socket._handle
 	});
-	socket.encrypted = true;
 
-	var cleartextStream = new Stream;
-	cleartextStream.readable = true;
+	var readBuffer = null;
 
 	var client = forge.tls.createConnection({
 		server: false,
@@ -67,9 +56,15 @@ exports.connect = function (options, callback) {
 		},
 		dataReady: function(connection) {
 			// clear data from the server is ready
-			var data = connection.data.getBytes();
+			var data = connection.data.getBytes(),
+				buffer = new Buffer(data);
+
 			console.log('[tls] received: ' + data);
-			cleartextStream.emit('data', new Buffer(data));
+			
+			readBuffer = buffer;
+
+			//cleartextStream.emit('data', buffer);
+			cleartextStream.push(buffer);
 		},
 		closed: function() {
 			console.log('[tls] disconnected');
@@ -88,30 +83,57 @@ exports.connect = function (options, callback) {
 		console.log('[socket] disconnected');
 		cleartextStream.emit('end');
 	});
-	if (socket.readyState !== 'open') {
-		socket.on('connect', function() {
-			console.log('[socket] connected');
-			client.handshake();
-		});
-	} else {
-		client.handshake();
-	}
 
 	cleartextStream.end = function (data) {
 		socket.end(data);
 	};
 	cleartextStream.destroy = function () {
-		destroy.end();
+		socket.destroy();
 	};
+
+	client.handshake();
+}
+
+exports.connect = function (options, callback) {
+	options = options || {};
+	callback = callback || function () {};
+
+	if (!options.socket) {
+		throw new Error('tls.connect() without providing a socket is not supported for the moment');
+	}
+
+	// TODO: implement TLSSocket
+	var cleartextStream = new Stream.Readable;
+	cleartextStream.readable = true;
+	cleartextStream.encrypted = true;
+
+	// Triggered when reading starts
+	cleartextStream._read = function () {};
 
 	// Forward events from cleartextStream to options.socket
 	// Unencrypted messages are sent to the original socket
-	cleartextStream.on('data', function (data) {
-		options.socket.emit('data', data);
+	// Only if in flowing mode (if there is a listener for the `data` event)
+	var isForwardingData = false;
+	cleartextStream.on('newListener', function (eventName, cb) {
+		if (!isForwardingData && eventName == 'data') {
+			isForwardingData = true; // It's important to change this before calling .on() for infinite loops
+			cleartextStream.on('data', function (data) {
+				options.socket.emit('data', data);
+			});
+		}
 	});
 	cleartextStream.on('end', function (data) {
 		options.socket.emit('end', data);
 	});
+
+	if (options.socket.readyState !== 'open') {
+		options.socket.on('connect', function() {
+			console.log('[socket] connected');
+			startTLS(options, cleartextStream, callback);
+		});
+	} else {
+		startTLS(options, cleartextStream, callback);
+	}
 
 	return cleartextStream;
 };
