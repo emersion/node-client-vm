@@ -365,7 +365,7 @@
 			telnet.connect(options.hostname, options.port, function (client) {
 				uiStatus('Connected to server!');
 
-				var $cmd = $('#telnet-cmd-form input[name="cmd"').focus();
+				var $cmd = $('#telnet-cmd-form input[name="cmd"]').focus();
 				$('#telnet-cmd-form').off('submit').submit(function (e) {
 					e.preventDefault();
 
