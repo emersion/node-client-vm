@@ -395,7 +395,9 @@
 			env: {},
 			exit: function () {},
 			version: 'v0.10.30',
-			versions: {},
+			versions: {
+				node: 'v0.10.30'
+			},
 			config: {},
 			kill: function () {},
 			pid: 0,

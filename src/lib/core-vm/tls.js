@@ -23,9 +23,27 @@ exports.connect = function (options, callback) {
 	var client = forge.tls.createConnection({
 		server: false,
 		verify: function(connection, verified, depth, certs) {
-			// skip verification for testing
-			console.log('[tls] server certificate verified');
-			return true;
+			if (!options.rejectUnauthorized || !options.servername) {
+				console.log('[tls] server certificate verification skipped');
+				return true;
+			}
+
+			console.log('[tls] skipping certificate trust verification');
+			verified = true;
+
+			if (depth === 0) {
+				var cn = certs[0].subject.getField('CN').value;
+				if (cn !== options.servername) {
+					verified = {
+						alert: forge.tls.Alert.Description.bad_certificate,
+						message: 'Certificate common name does not match hostname.'
+					};
+					console.warn('[tls] '+cn+' !== '+options.servername);
+				}
+				console.log('[tls] server certificate verified');
+			}
+
+			return verified;
 		},
 		connected: function(connection) {
 			console.log('[tls] connected');
