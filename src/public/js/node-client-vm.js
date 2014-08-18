@@ -418,7 +418,7 @@
 			},
 			binding: function (id) {
 				var binding = native[id];
-console.info('binding '+id);
+//console.info('binding '+id);
 				if (typeof binding == 'undefined') {
 					console.warn('TODO: unimplemented binding: '+id);
 					return {};
@@ -523,6 +523,7 @@ console.info('binding '+id);
 
 		global['_node_module'] = module;
 		global[bindingsObjName] = bindings;
+
 		script = '(function ('+argsNames.join(', ')+') { '+
 			script+
 			'\n}).call(_node_module, '+argsValues.join(', ')+');'+
@@ -556,8 +557,9 @@ console.info('binding '+id);
 		this.children = [];
 		if (data.dependencies) {
 			for (var depName in data.dependencies) {
-				var depData = data.dependencies[depName];
-				this.children.push(new Node.Module(depData, this));
+				var depData = data.dependencies[depName],
+					child = new Node.Module(depData, this);
+				this.children.push(child);
 			}
 		}
 
@@ -567,10 +569,10 @@ console.info('binding '+id);
 	};
 	Node.Module.prototype = {
 		require: function (id) {
-console.info('require '+id);
+//console.log('require '+id);
 			var exports = {};
 
-			if (id.substr(0, 2) == './' || id.substr(0, 3) == '../') {
+			if (window._node_module_context && (id.substr(0, 2) == './' || id.substr(0, 3) == '../')) {
 				var path = this.require('path');
 
 				//TODO: do not use _node_module_context.__dirname
@@ -582,7 +584,7 @@ console.info('require '+id);
 
 			// Check cache
 			if (typeof this.require.cache[id] != 'undefined') {
-console.log('require cached '+id);
+//console.log('require cached '+id);
 				return this.require.cache[id];
 			}
 
@@ -593,10 +595,10 @@ console.log('require cached '+id);
 			this.require._id = id;
 
 			if (typeof core[id] != 'undefined') {
-console.log('require core module '+id);
+//console.log('require core module '+id);
 				exports = core[id];
 			} else if (typeof coreScripts[id] != 'undefined') {
-console.log('require core lib '+id);
+//console.log('require core lib '+id);
 				// TODO: use a core module
 				exports = runScript(this, coreScripts[id], {
 					__filename: id + '.js',
@@ -605,27 +607,23 @@ console.log('require core lib '+id);
 			} else if (id.substr(0, 2) == './') {
 				var path = this.require('path');
 
-				var pathname = id.substr(2);
+				var pathname = id.substr(2); // Remove ./
 
 				var files = this._files;
 
 				var pathsToTry = [
-					{ path: pathname },
-					{ path: pathname+'.js', type: 'js' },
-					{ path: pathname+'.json', type: 'json' },
-					{ path: pathname+'.node', type: 'addon' },
+					{ path: pathname, type: 'file' },
+					{ path: pathname+'.js', type: 'file' },
+					{ path: pathname+'.json', type: 'file' },
+					{ path: pathname+'.node', type: 'file' },
 					{ path: pathname+'/package.json', type: 'package' },
-					{ path: pathname+'/index.js', type: 'js' },
-					{ path: pathname+'/index.node', type: 'addon' }
+					{ path: pathname+'/index.js', type: 'file' },
+					{ path: pathname+'/index.node', type: 'file' }
 				];
 				
 				var dep = null;
 				for (var i = 0; i < pathsToTry.length; i++) {
 					var toTry = pathsToTry[i];
-
-					if (!toTry.type) {
-						toTry.type = 'js'; //TODO: json support
-					}
 
 					if (typeof files[toTry.path] != 'undefined') {
 						dep = {
@@ -633,6 +631,7 @@ console.log('require core lib '+id);
 							type: toTry.type,
 							contents: files[toTry.path]
 						};
+						break;
 					}
 				}
 
@@ -640,16 +639,19 @@ console.log('require core lib '+id);
 					throw new Error('Cannot find module \''+id+'\'');
 				}
 
-				if (dep.type == 'js') {
-console.log('require file '+id, dep.path);
-					exports = runScript(this, dep.contents, {
-						__filename: dep.path,
-						__dirname: path.dirname(dep.path)
-					});
-				} else if (dep.type == 'json') {
-					exports = JSON.parse(dep.contents);
-				} else if (dep.type == 'addon') {
-					throw new Error('Cannot load module \''+id+'\': node addons are not supported');
+				if (dep.type == 'file') {
+//console.log('require file '+id, dep.path, this.id);
+					var ext = path.extname(dep.path),
+						handler = this.require.extensions[ext];
+
+					if (typeof handler == 'function') {
+						exports = handler(this, dep.contents, {
+							__filename: dep.path,
+							__dirname: path.dirname(dep.path)
+						});
+					} else {
+						throw new Error('Cannot load module \''+id+'\': unsupported file type');
+					}
 				} else if (dep.type == 'package') {
 					//TODO: parse package.json, build a new module, run module
 					throw new Error('Cannot load module \''+id+'\': loading submodules is not implemented for the moment');
@@ -666,6 +668,7 @@ console.log('require file '+id, dep.path);
 				}
 
 				if (childToRun) {
+//console.log('require module child '+id);
 					exports = childToRun.run();
 				} else {
 					console.warn('TODO: require '+id);
@@ -687,25 +690,29 @@ console.log('require file '+id, dep.path);
 		run: function (opts) {
 			var path = this.require('path');
 
-			var mainPath = this.filename,
-				mainScript;
+			if (this.filename.substr(0, 2) == './') {
+				this.filename = this.filename.substr(2);
+			}
 
-			var pathsToTry = [this.filename, this.filename+'.js'];
+			var pathsToTry = [this.filename, this.filename+'.js', this.filename+'.json'];
 			for (var i = 0; i < pathsToTry.length; i++) {
-				var pathname = pathsToTry[i];
-				if (pathname.substr(0, 2) == './') {
-					pathname = pathname.substr(2);
-					console.log(pathname);
-				}
-
-				mainScript = this._files[pathname];
+				var pathname = pathsToTry[i],
+					mainScript = this._files[pathname];
 
 				if (typeof mainScript != 'undefined') {
 					this.filename = pathname;
-					return runScript(this, mainScript, {
-						__filename: pathname,
-						__dirname: path.dirname(pathname)
-					});
+
+					var ext = path.extname(pathname),
+						handler = this.require.extensions[ext];
+
+					if (typeof handler == 'function') {
+						return handler(this, mainScript, {
+							__filename: pathname,
+							__dirname: path.dirname(pathname)
+						});
+					} else {
+						throw new Error('Cannot load module \''+this.id+'\': unsupported file type');
+					}
 				}
 			}
 
@@ -713,9 +720,23 @@ console.log('require file '+id, dep.path);
 		}
 	};
 	Node.Module.prototype.require.resolve = function (id) {
-		console.log('TODO: require.resolve '+id);
+		console.warn('TODO: require.resolve '+id);
 
 		return '';
+	};
+	/**
+	 * @deprecated
+	 */
+	Node.Module.prototype.require.extensions = {
+		'.js': function (module, contents, bindings) {
+			return runScript(module, contents, bindings);
+		},
+		'.json': function (module, contents) {
+			return JSON.parse(contents);
+		},
+		'.node': function () {
+			throw new Error('Cannot load module \''+id+'\': node addons are not supported');
+		}
 	};
 
 	/**
