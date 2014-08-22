@@ -37,14 +37,13 @@
 					<label>Password: <input type="password" name="password"></label><br>
 					<label><input type="checkbox" name="rejectUnauthorized" checked> Check SSL certificate</label><br><br>
 
-
 					<label>From: <input type="email" name="from"></label><br>
 					<label>To: <input type="email" name="to"></label><br>
 					<label>Body:<br><textarea name="body" cols="50" rows="10">From: the browser <browser@example.org>
-		To: you <you@example.org>
-		Subject: hello world
+To: you <you@example.org>
+Subject: hello world
 
-		Hello from your web browser!</textarea></label>
+Hello from your web browser!</textarea></label>
 
 					<p>
 						<button type="submit" class="btn btn-primary">Send an e-mail</button>
@@ -94,7 +93,6 @@
 
 	<script src="/bower_components/jquery/dist/jquery.min.js"></script>
 	<script src="/bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
-	<script src="/js/node-client-vm.js"></script>
 	<script>
 	var $status = $('#status'), maxLength = 1024*32;
 	function uiStatus(msg) {
@@ -121,6 +119,16 @@
 	}
 	function uiError(msg) {
 		return uiStatus('<span style="color:red;">'+msg+'</span>');
+	}
+	function loadModule(moduleName) {
+		return $.ajax({
+			url: '/api/vm/load/'+moduleName,
+			type: 'get',
+			cache: true,
+			dataType: 'script'
+		}).then(function () {
+			return window[moduleName];
+		});
 	}
 
 	function populateOptions(form, options) {
@@ -151,8 +159,7 @@
 		uiStatus('Loading core modules and smtp-protocol...');
 
 		var startTime = (new Date()).getTime();
-		Node.Module.load('smtp-protocol').then(function (module) {
-			var smtp = module.run();
+		loadModule('smtp').then(function (smtp) {
 			uiStatus('SMTP module initialized!');
 
 			var endTime = (new Date()).getTime();
@@ -261,8 +268,7 @@
 		uiStatus('Loading core modules and imap...');
 
 		var startTime = (new Date()).getTime();
-		Node.Module.load('imap').then(function (module) {
-			var Imap = module.run();
+		loadModule('imap').then(function (Imap) {
 			uiStatus('IMAP module initialized!');
 
 			var endTime = (new Date()).getTime();
@@ -358,11 +364,19 @@
 	function tcpConnect(options) {
 		$('#status').empty();
 		uiStatus('Loading core modules...');
-		Node.Module.fromFile('/js/modules/telnet.js').then(function (module) {
-			var telnet = module.run();
+		
+		// Below is the old API. TODO: be able to evaluate scripts in a Node context
+		//Node.Module.fromFile('/js/modules/telnet.js').then(function (module) {
+		//	var telnet = module.run();
+		//});
+
+		loadModule('telnet').then(function (telnet) {
 			uiStatus('Modules loaded! Now connecting to '+options.hostname+':'+options.port);
 
-			telnet.connect(options.hostname, options.port, function (client) {
+			telnet.connect({
+				host: options.hostname,
+				port: options.port
+			}, function (client) {
 				uiStatus('Connected to server!');
 
 				var $cmd = $('#telnet-cmd-form input[name="cmd"]').focus();
@@ -380,6 +394,8 @@
 					uiReceived(chunk.toString());
 				});
 			});
+		}, function (err) {
+			uiError(err);
 		});
 	}
 	$('#telnet-form').submit(function (e) {

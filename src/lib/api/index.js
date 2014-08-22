@@ -2,194 +2,105 @@ var fs = require('fs');
 var path = require('path');
 var express = require('express');
 var Q = require('q');
-var walk = require('../walk');
+var browserify = require('browserify');
 
-var loadModulePath = function (modulePath) {
-	var moduleName = path.basename(modulePath),
-		packagePath = path.join(modulePath, 'package.json');
+var config = require('../../config');
+var cacheDirPath = path.join(__dirname, '..', '..', 'cache');
 
-	var mod = {};
-	mod.id = moduleName;
-	return Q.denodeify(fs.readFile)(packagePath).then(function (json) { // Read package.json
-		var pkg = null;
-		try {
-			pkg = JSON.parse(json);
-		} catch (err) {
-			res.status(500).send({
-				error: 'Cannot load module '+moduleName+' (invalid package.json: '+err+')'
-			});
+// Enabled modules
+// TODO: store this in config
+var modules = {
+	'smtp': require.resolve('smtp-protocol'),
+	'imap': require.resolve('imap'),
+	'telnet': require.resolve('./modules/telnet'),
+};
+
+/**
+ * @see https://stackoverflow.com/questions/21194934/node-how-to-create-a-directory-if-doesnt-exist
+ */
+function ensureDirExists(path, mask, cb) {
+	if (typeof mask == 'function') { // allow the `mask` parameter to be optional
+		cb = mask;
+		mask = 0777;
+	}
+
+	fs.mkdir(path, mask, function(err) {
+		if (err) {
+			if (err.code == 'EEXIST') cb(null); // ignore the error if the folder already exists
+			else cb(err); // something else went wrong
+		} else cb(null); // successfully created folder
+	});
+}
+
+function generateModule(moduleName, modulePath) {
+	return browserify({
+		builtins: require('./builtins'),
+		standalone: moduleName,
+		debug: false // True to add a sourceMappingURL - can produce huge files!
+	})
+	.add(modulePath, { entry: true })
+	.bundle()
+	.on('error', function (err) { console.error(err); });
+}
+
+function getModule(moduleName, modulePath, cb) {
+	if (!config.cache) { // Cache disabled
+		process.nextTick(function () {
+			cb(generateModule(moduleName, modulePath));
+		});
+		return;
+	}
+
+	var cachePath = path.join(cacheDirPath, moduleName+'.js');
+
+	// Make sure the cache dir exists
+	ensureDirExists(cacheDirPath, function (err) {
+		if (err) {
+			cb(err);
 			return;
 		}
-		mod.package = pkg;
-	}, function (err) {
-		throw {
-			code: 500,
-			error: 'Cannot load module '+moduleName+' (cannot read package.json: '+err+')'
-		};
-	}).then(function () { // Get module contents
-		return Q.denodeify(walk.read)(modulePath, {
-			each: function (file, stats) {
-				// Ignore submodules
-				if (file == path.join(modulePath, 'node_modules')) {
-					return false;
-				}
 
-				// Ignore package.json
-				if (file == packagePath) {
-					return false;
-				}
+		// Is this module cached?
+		fs.exists(cachePath, function (exists) {
+			var bundle;
+			if (exists) { // If the module is cached, use it
+				bundle = fs.createReadStream(cachePath);
+			} else { // Otherwise, generate it
+				bundle = generateModule(moduleName, modulePath);
+			}
 
-				// Only keep *.js and *.json
-				if (!stats.isDirectory() && !~['.js', '.json'].indexOf(path.extname(file))) {
-					return false;
-				}
+			cb(bundle);
+
+			if (!exists) { // If the file is not cached, let's cache it
+				var cacheStream = fs.createWriteStream(cachePath);
+				bundle.pipe(cacheStream);
 			}
-		}).then(function (files) {
-			mod.files = {};
-			for (var filepath in files) {
-				var pathname = path.relative(modulePath, filepath);
-				mod.files[pathname] = files[filepath];
-			}
-		}, function (err) {
-			throw {
-				code: 500,
-				error: 'Cannot load module '+moduleName+' (cannot read module contents: '+err+')'
-			};
 		});
-	}).then(function () { // Load submodules
-		if (mod.package.dependencies) {
-			var deps = [],
-				depsNames = Object.keys(mod.package.dependencies),
-				pending = depsNames.length,
-				promises = [];
-
-			depsNames.forEach(function (name) {
-				// TODO: circular dependencies support
-				var promise = loadModulePath(path.join(modulePath, 'node_modules', name)).then(function (submod) {
-					deps.push(submod);
-				});
-
-				promises.push(promise);
-			});
-			
-			return Q.all(promises).then(function () {
-				mod.dependencies = deps;
-			});
-		}
-	}).then(function () {
-		return mod;
 	});
-};
-
-var loadModule = function (moduleName) {
-	// Try to resolve the module name
-	// Does not work if the main file is in a subfolder
-	/*var mainPath;
-	try {
-		mainPath = require.resolve(moduleName);
-	} catch (err) {
-		return Q.reject({
-			code: 404,
-			error: 'Cannot find module '+moduleName
-		});
-	}
-	var modulePath = path.dirname(mainPath);*/
-
-	var modulePath = path.join(__dirname, '..', '..', '..', 'node_modules', moduleName);
-	return loadModulePath(modulePath);
-};
+}
 
 module.exports = function (server) {
 	var app = express();
 
 	// Loader
 	app.get('/load/:module', function (req, res) {
-		var moduleName = req.param('module');
+		var moduleName = req.param('module'),
+			modulePath = modules[moduleName];
 
-		loadModule(moduleName).then(function (mod) {
-			res.send(mod);
-		}, function (err) {
-			if (err instanceof Error) {
-				throw err;
-			}
+		if (!modulePath) {
+			res.status(404).send('Cannot find module '+moduleName);
+			return;
+		}
 
-			if (err.code) {
-				res.status(err.code);
-			}
-			res.send(err);
+		res.type('application/javascript');
+
+		getModule(moduleName, modulePath, function (bundle) {
+			bundle.pipe(res)
 		});
 	});
 
 	// Core modules
-	app.get('/core', function (req, res) {
-		var coreModulesNames = ['buffer', 'crypto-browserify', 'node-forge'];
-		var core = {};
-
-		core.libs = {};
-		var importLibs = function (dirname) {
-			return Q.denodeify(walk.read)(dirname, {
-				each: function (filepath) {
-					var basename = path.basename(filepath, '.js');
-
-					if (core.libs[basename]) {
-						return false;
-					}
-
-					//TODO: filter core modules, remove unused ones
-				}
-			}).then(function (files) {
-				for (var filepath in files) {
-					var basename = path.basename(filepath, '.js');
-					core.libs[basename] = files[filepath];
-				}
-			}, function (err) {
-				throw {
-					code: 500,
-					error: String(err)
-				};
-			})
-		};
-
-		importLibs(path.join(__dirname, '..', 'core-vm')).then(function () {
-			return importLibs(path.join(__dirname, '..', 'core'));
-		}).then(function () {
-			var promises = [];
-
-			core.modules = {};
-			var loadCoreModule = function (moduleName) {
-				return loadModule(moduleName).then(function (mod) {
-					core.modules[moduleName.replace('-browserify', '')] = mod;
-				});
-			};
-			for (var i = 0; i < coreModulesNames.length; i++) {
-				promises.push(loadCoreModule(coreModulesNames[i]));
-			}
-
-			return Q.all(promises);
-		}).then(function () {
-			res.send(core);
-		}, function (err) {
-			if (err.code) {
-				res.status(err.code);
-			}
-			res.send(err);
-		});
-	});
-
-	app.post('/core/dns/lookup', function (req, res) {
-		var dns = require('dns');
-
-		var args = req.body;
-		args.push(function () {
-			var args = Array.prototype.slice.call(arguments);
-			res.send(args);
-		});
-
-		dns.lookup.apply(dns, args);
-	});
-
-	// Wrappers
-	app.use('/wrap', require('./wrap')(server));
+	app.use('/net', require('./net')(server));
 
 	return app;
 };

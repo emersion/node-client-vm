@@ -1,12 +1,9 @@
 var net = require('net');
 
-exports.connect = function (host, port, cb) {
+exports.connect = function (opts, cb) {
 	cb = cb || function () {};
 
-	var stream = net.connect({
-		host: host,
-		port: port
-	}, function () {
+	var stream = net.connect(opts, function () {
 		stream.setEncoding('utf8');
 		cb(stream);
 	});

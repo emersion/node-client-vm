@@ -23,13 +23,11 @@
   },
   "dependencies": {
     "body-parser": "^1.4.3",
-    "buffer": "^2.5.0",
-    "crypto-browserify": "^3.0.1",
+    "browserify": "^5.10.0",
     "errorhandler": "^1.1.1",
-    "events": "^1.0.1",
     "express": "^4.5.1",
     "express-ws": "^0.1.0",
-    "node-forge": "^0.6.12",
-    "q": "^1.0.1"
+    "q": "^1.0.1",
+    "tls-browserify": "^0.1.0"
   }
 }
