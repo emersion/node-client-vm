@@ -364,33 +364,34 @@ Hello from your web browser!</textarea></label>
 	function tcpConnect(options) {
 		$('#status').empty();
 		uiStatus('Loading core modules...');
-		
+
 		// Below is the old API. TODO: be able to evaluate scripts in a Node context
 		//Node.Module.fromFile('/js/modules/telnet.js').then(function (module) {
 		//	var telnet = module.run();
 		//});
 
-		loadModule('telnet').then(function (telnet) {
+		loadModule('net').then(function (net) {
 			uiStatus('Modules loaded! Now connecting to '+options.hostname+':'+options.port);
 
-			telnet.connect({
+			var stream = net.connect({
 				host: options.hostname,
 				port: options.port
-			}, function (client) {
+			}, function () {
 				uiStatus('Connected to server!');
+				stream.setEncoding('utf8');
 
 				var $cmd = $('#telnet-cmd-form input[name="cmd"]').focus();
 				$('#telnet-cmd-form').off('submit').submit(function (e) {
 					e.preventDefault();
 
 					var cmd = $cmd.val();
-					client.write(cmd);
+					stream.write(cmd);
 					uiSent(cmd);
 
 					$cmd.val('').focus();
 				});
 
-				client.on('data', function (chunk) {
+				stream.on('data', function (chunk) {
 					uiReceived(chunk.toString());
 				});
 			});

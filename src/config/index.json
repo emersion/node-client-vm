@@ -3,6 +3,6 @@
 	"modules": {
 		"smtp":"smtp-protocol",
 		"imap": "imap",
-		"telnet": "./lib/modules/telnet"
+		"net": "net-browserify"
 	}
 }
