@@ -103,7 +103,7 @@ module.exports = function (server) {
 	});
 
 	// Core modules
-	app.use(require('./net')(server));
+	app.use(require('net-browserify/api')(server));
 
 	return app;
 };
