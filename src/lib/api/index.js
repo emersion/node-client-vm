@@ -15,6 +15,10 @@ function getEnabledModules() {
 	for (var moduleName in (config.modules || {})) {
 		var modulePath = config.modules[moduleName];
 
+		if (builtins[modulePath]) { // We are requesting a built-in module
+			modulePath = builtins[modulePath];
+		}
+
 		if (modulePath.substr(0, 2) == './' || modulePath.substr(0, 3) == '../') {
 			// Relative path
 			modulePath = path.join(__dirname, '..', '..', modulePath);

@@ -3,6 +3,6 @@
 	"modules": {
 		"smtp":"smtp-protocol",
 		"imap": "imap",
-		"net": "net-browserify"
+		"net": "net"
 	}
 }
