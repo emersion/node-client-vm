@@ -60,9 +60,6 @@ function Socket(options) {
 	// these will be set once there is a connection
 	this.readable = this.writable = false;
 
-	//this._pendingData = null;
-	//this._pendingEncoding = '';
-
 	// handle strings directly
 	this._writableState.decodeStrings = false;
 
@@ -99,10 +96,15 @@ Socket.prototype._onTimeout = function () {
 };
 
 Socket.prototype.setNoDelay = function (enable) {};
-
 Socket.prototype.setKeepAlive = function (setting, msecs) {};
 
-Socket.prototype.address = function () {}; //TODO
+Socket.prototype.address = function () {
+	return {
+		address: this.remoteAddress,
+		port: this.remotePort,
+		family: this.remoteFamily
+	};
+};
 
 Object.defineProperty(Socket.prototype, 'readyState', {
 	get: function() {
@@ -127,6 +129,10 @@ Socket.prototype._read = function () {};
 Socket.prototype.end = function(data, encoding) {
 	stream.Duplex.prototype.end.call(this, data, encoding);
 	this.writable = false;
+
+	if (this._ws) {
+		this._ws.close();
+	}
 
 	// just in case we're waiting for an EOF.
 	if (this.readable && !this._readableState.endEmitted)
@@ -173,15 +179,19 @@ Socket.prototype.destroy = function(exception) {
 	this.destroyed = true;
 };
 
-//TODO
-Socket.prototype.remoteAddress = undefined;
-Socket.prototype.remoteFamily = undefined;
-Socket.prototype.remotePort = undefined;
+Socket.prototype.remoteAddress = null;
+Socket.prototype.remoteFamily = null;
+Socket.prototype.remotePort = null;
 
-Socket.prototype.localAddress = '127.0.0.1';
-Socket.prototype.localPort = '80';
+// Used for servers only - not here
+Socket.prototype.localAddress = null;
+Socket.prototype.localPort = null;
+
+Socket.prototype.bytesRead = 0;
+Socket.prototype.bytesWritten = 0;
 
 Socket.prototype._write = function (data, encoding, cb) {
+	var self = this;
 	cb = cb || function () {};
 
 	// If we are still connecting, then buffer this for later.
@@ -198,14 +208,17 @@ Socket.prototype._write = function (data, encoding, cb) {
 	this._pendingData = null;
 	this._pendingEncoding = '';
 
-	if (encoding == 'binary' && typeof data == 'string') {
-		data = new Buffer(data, encoding); // Setting encoding is very important for binary data - otherwise the data gets modified
+	if (encoding == 'binary' && typeof data == 'string') { //TODO: maybe apply this for all string inputs?
+		// Setting encoding is very important for binary data - otherwise the data gets modified
+		data = new Buffer(data, encoding);
 	}
 
+	// Send the data
 	this._ws.send(data);
 
 	process.nextTick(function () {
 		//console.log('[tcp] sent: ', data.toString(), data.length);
+		self.bytesWritten += data.length;
 		cb();
 	});
 };
@@ -215,9 +228,6 @@ Socket.prototype.write = function(chunk, encoding, cb) {
 		throw new TypeError('invalid data');
 	return stream.Duplex.prototype.write.apply(this, arguments);
 };
-
-//TODO
-Socket.prototype.bytesWritten = 0;
 
 Socket.prototype.connect = function(options, cb) {
 	var self = this;
@@ -262,6 +272,10 @@ Socket.prototype.connect = function(options, cb) {
 				return;
 			}
 
+			self.remoteAddress = data.remote.address;
+			self.remoteFamily = data.remote.family;
+			self.remotePort = data.remote.port;
+
 			self._connectWebSocket(data.token, function (err) {
 				if (err) {
 					cb(err);
@@ -302,7 +316,7 @@ Socket.prototype._handleWebsocket = function () {
 	var self = this;
 
 	this._ws.addEventListener('open', function () {
-		console.log('TCP OK');
+		//console.log('TCP OK');
 
 		self._connecting = false;
 		self.readable = true;
@@ -312,13 +326,16 @@ Socket.prototype._handleWebsocket = function () {
 		self.read(0);
 	});
 	this._ws.addEventListener('error', function (e) {
-		console.log('TCP error', e);
+		// `e` doesn't contain anything useful (https://developer.mozilla.org/en/docs/WebSockets/Writing_WebSocket_client_applications#Connection_errors)
+		//console.warn('TCP error', e);
+		self.emit('error', 'An error occured with the WebSocket');
 	});
 	this._ws.addEventListener('message', function (e) {
 		var contents = e.data;
 
 		var gotBuffer = function (buffer) {
 			//console.log('[tcp] received: ' + buffer.toString(), buffer.length);
+			self.bytesRead += buffer.length;
 			self.push(buffer);
 		};
 
@@ -338,7 +355,25 @@ Socket.prototype._handleWebsocket = function () {
 		}
 	});
 	this._ws.addEventListener('close', function () {
-		console.log('TCP closed');
-		//TODO
+		if (self.readyState == 'open') {
+			//console.log('TCP closed');
+			self.destroy();
+		}
 	});
+};
+
+exports.isIP = function (input) {
+	if (exports.isIPv4(input)) {
+		return 4;
+	} else if (exports.isIPv6(input)) {
+		return 6;
+	} else {
+		return 0;
+	}
+};
+exports.isIPv4 = function(input) {
+	return /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(input);
+};
+exports.isIPv6 = function(input) {
+	return /^(([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))$/.test(input);
 };

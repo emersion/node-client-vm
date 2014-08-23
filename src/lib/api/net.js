@@ -3,9 +3,6 @@ var expressWs = require('express-ws');
 var net = require('net');
 var crypto = require('crypto');
 
-var TCP = process.binding('tcp_wrap').TCP;
-var dns = require('dns');
-
 function generateToken() {
 	return crypto.randomBytes(32).toString('hex');
 }
@@ -15,7 +12,7 @@ module.exports = function (server) {
 
 	var sockets = {};
 
-	app.post('/connect', function (req, res) {
+	app.post('/api/vm/net/connect', function (req, res) {
 		var socket = net.connect({
 			host: req.body.host,
 			port: req.body.port
@@ -41,15 +38,16 @@ module.exports = function (server) {
 
 			console.log('Connected to '+req.body.host+':'+req.body.port+' ('+token+')');
 
+			var remote = socket.address();
 			res.send({
-				token: token
+				token: token,
+				remote: remote
 			});
 		});
 	});
 
 	var wss = expressWs(app, server);
 
-	// TODO: express mounting doesn't work with websockets, we have to provide the full path here
 	app.ws('/api/vm/net/socket', function (ws, req) {
 		var token = req.query.token;
 

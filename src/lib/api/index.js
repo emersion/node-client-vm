@@ -7,6 +7,9 @@ var browserify = require('browserify');
 var config = require('../../config');
 var cacheDirPath = path.join(__dirname, '..', '..', 'cache');
 
+// Built-in modules
+var builtins = require('./builtins');
+
 // Enabled modules
 // TODO: store this in config
 var modules = {
@@ -34,7 +37,7 @@ function ensureDirExists(path, mask, cb) {
 
 function generateModule(moduleName, modulePath) {
 	return browserify({
-		builtins: require('./builtins'),
+		builtins: builtins,
 		standalone: moduleName,
 		debug: false // True to add a sourceMappingURL - can produce huge files!
 	})
@@ -83,7 +86,7 @@ module.exports = function (server) {
 	var app = express();
 
 	// Loader
-	app.get('/load/:module', function (req, res) {
+	app.get('/api/vm/load/:module', function (req, res) {
 		var moduleName = req.param('module'),
 			modulePath = modules[moduleName];
 
@@ -100,7 +103,7 @@ module.exports = function (server) {
 	});
 
 	// Core modules
-	app.use('/net', require('./net')(server));
+	app.use(require('./net')(server));
 
 	return app;
 };
