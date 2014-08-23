@@ -10,13 +10,24 @@ var cacheDirPath = path.join(__dirname, '..', '..', 'cache');
 // Built-in modules
 var builtins = require('./builtins');
 
-// Enabled modules
-// TODO: store this in config
-var modules = {
-	'smtp': require.resolve('smtp-protocol'),
-	'imap': require.resolve('imap'),
-	'telnet': require.resolve('./modules/telnet'),
-};
+function getEnabledModules() {
+	var modules = {};
+	for (var moduleName in (config.modules || {})) {
+		var modulePath = config.modules[moduleName];
+
+		if (modulePath.substr(0, 2) == './' || modulePath.substr(0, 3) == '../') {
+			// Relative path
+			modulePath = path.join(__dirname, '..', '..', modulePath);
+		}
+
+		try {
+			modules[moduleName] = require.resolve(modulePath);
+		} catch (err) {
+			console.warn('Cannot load module "'+moduleName+'"', err);
+		}
+	}
+	return modules;
+}
 
 /**
  * @see https://stackoverflow.com/questions/21194934/node-how-to-create-a-directory-if-doesnt-exist
@@ -84,6 +95,8 @@ function getModule(moduleName, modulePath, cb) {
 
 module.exports = function (server) {
 	var app = express();
+
+	var modules = getEnabledModules();
 
 	// Loader
 	app.get('/api/vm/load/:module', function (req, res) {
