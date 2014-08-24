@@ -29,6 +29,6 @@
     "express-ws": "^0.1.0",
     "net-browserify": "git+https://github.com/emersion/net-browserify.git#v0.1.1",
     "q": "^1.0.1",
-    "tls-browserify": "^0.1.0"
+    "tls-browserify": "^0.1.3"
   }
 }
