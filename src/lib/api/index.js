@@ -119,8 +119,9 @@ module.exports = function (server) {
 		});
 	});
 
-	// Core modules
-	app.use(require('net-browserify/api')(server));
+	// Built-ins
+	var netOptions = (config.builtins && config.builtins.net) ? config.builtins.net : {};
+	app.use(require('net-browserify/api')(server, netOptions));
 
 	return app;
 };
