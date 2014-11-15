@@ -27,7 +27,7 @@
     "errorhandler": "^1.1.1",
     "express": "^4.5.1",
     "express-ws": "^0.1.0",
-    "net-browserify": "git+https://github.com/emersion/net-browserify.git#v0.1.1",
+    "net-browserify": "^0.1.1",
     "q": "^1.0.1",
     "tls-browserify": "^0.1.3"
   }
